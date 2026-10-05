@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE {odata}.{COLLiquidateProcedures}
+CREATE OR ALTER PROCEDURE [dbo].[COLLiquidateProcedures]
     @PatientVisit    NVARCHAR(50),
     @FacilityId      NVARCHAR(50),
     @TargetClaimGuid NVARCHAR(50) 
@@ -329,7 +329,7 @@ BEGIN
             Facility, PatientId, PatientVisit, TransactionType, ClaimGuid, SurgeryGuid, ContractGuid, 
             ContractExceptionGuid, Ambity, BaseUnitValue, SurgicalComponent, SurgicalGroup, SurgicalApproach, 
             SameApproach, ShiftTypeApplied, SurchargeAmount, CupsCode, CUMCode, ExternalProcessedDateTime, 
-            DateTimeEntered, RevenueCode, Quantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
+            DateTimeEntered, RevenueCode, TransactionQuantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
             USDBasePrice, USDPerItemChargeAmount, PaymentType, NetAmount, TaxAmount, DiscountAmount, 
             PerItemChargeAmount, [Status]
         )
@@ -355,7 +355,7 @@ BEGIN
             f.TargetDate, 
             GETDATE() AS DateTimeEntered,        
             f.ResolvedManual AS RevenueCode,              
-            1 AS Quantity,                       
+            1 AS TransactionQuantity,                       
             1 AS ItemCost,                       
             f.LaterialityCode AS ItemSnomedCode, 
             f.RawCatalogUnits AS ItemAlternateCode, 

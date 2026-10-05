@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE {odata}.{COLInvoiceScrubber}
+CREATE OR ALTER PROCEDURE [dbo].[COLInvoiceScrubber]
     @PatientVisit    NVARCHAR(50),
     @FacilityId      NVARCHAR(50),
     @TargetClaimGuid NVARCHAR(50)
@@ -22,6 +22,7 @@ BEGIN
     DECLARE @PatientSex VARCHAR(20);
     DECLARE @AgeInYears INT;
     DECLARE @PatientId  NVARCHAR(50);
+    
     SELECT TOP 1 @PatientId = PatientId
     FROM ClinicalGeniusEhr.dbo.PatientVisits WITH(NOLOCK)
     WHERE PatientVisitUniqueId = @PatientVisit AND FacilityId = @FacilityId;
@@ -32,7 +33,7 @@ BEGIN
         @AgeInYears = DATEDIFF(YY, PatientDOB, GETDATE()) - 
                       CASE WHEN DATEADD(YY, DATEDIFF(YY, PatientDOB, GETDATE()), PatientDOB) > GETDATE() THEN 1 ELSE 0 END
     FROM ClinicalGeniusEhr.dbo.PatientTable WITH(NOLOCK)
-    WHERE PatientId = @PatientId;
+    WHERE RecordUniqueId = @PatientId;
 
     -- ==========================================================================================
     -- 2. Aggregate Visit Quantities (Filtered by Target Scope)
@@ -56,7 +57,7 @@ BEGIN
     -- ==========================================================================================
     ScrubberEvaluations AS (
         SELECT 
-            pt.TransactionType,       -- Surgery, Supplies, Diagnostics, etc.
+            pt.TransactionType,       
             pt.CupsCode,
             c.CUPSName AS ItemDescription,
             pt.TransactionQuantity AS LineQuantity,
@@ -82,7 +83,14 @@ BEGIN
                 WHEN c.Dx_requerido = '1' AND pt.ItemSnomedCode IS NULL 
                 THEN 'Diagnosis Required: This procedure cannot be billed without an associated ICD-10 code.'
                 ELSE NULL 
-            END AS DiagnosisError
+            END AS DiagnosisError,
+
+            -- Error 4: Age Limit Evaluation (Utilizing the computed @AgeInYears)
+            CASE 
+                WHEN c.Edad_min IS NOT NULL AND @AgeInYears < CAST(c.Edad_min AS INT) THEN 'Age Mismatch: Patient is too young for this procedure.'
+                WHEN c.Edad_max IS NOT NULL AND @AgeInYears > CAST(c.Edad_max AS INT) THEN 'Age Mismatch: Patient is too old for this procedure.'
+                ELSE NULL
+            END AS AgeError
 
         FROM ClinicalGeniusSupplyChain.dbo.PatientTransactions pt WITH(NOLOCK)
         INNER JOIN VisitAggregates va ON pt.CupsCode = va.CupsCode
@@ -107,11 +115,19 @@ BEGIN
         LineQuantity,
         TotalVisitQuantity,
         DateTimeEntered,
-        CONCAT_WS(' | ', GenderError, QuantityError, DiagnosisError) AS ScrubberViolationMessage
+        -- SQL Server 2014 Compatible String Aggregation (Replaces CONCAT_WS)
+        STUFF(
+            COALESCE(' | ' + GenderError, '') + 
+            COALESCE(' | ' + QuantityError, '') + 
+            COALESCE(' | ' + DiagnosisError, '') +
+            COALESCE(' | ' + AgeError, ''), 
+            1, 3, ''
+        ) AS ScrubberViolationMessage
     FROM ScrubberEvaluations
     WHERE GenderError IS NOT NULL 
        OR QuantityError IS NOT NULL 
        OR DiagnosisError IS NOT NULL
+       OR AgeError IS NOT NULL
     ORDER BY DateTimeEntered ASC;
 
 END;

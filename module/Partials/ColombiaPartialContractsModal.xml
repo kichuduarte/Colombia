@@ -146,7 +146,7 @@
           source="Plans,Tariffs,Documents" 
           sourcelabels="Planes,Tarifas,Documentos" 
           default="Plans"
-          provoke="[ContractButtonGroupSelect]=Plans|Documents;ContractGridList|options"/> 
+          provoke="ContractGridList|options"/> 
       </row>
       <row>
         <control name="ContractGridList" affector="ContractButtonGroupSelect" type="options" span="12">
@@ -173,6 +173,7 @@
             acctsvcreq="true"
             filter="Active=true,Type=General"
             datarequest="GetColombiaContractExceptions" 
+            appendrequest="ContractGuid=[ContractGuid]"
             source="StartDate,EndDate,Ranking,ShiftType,ServiceGroup,ArticleName,SurgeryGroup,CUPSCode"
             sourcelabels="Fecha Inicio,Fecha Término,Tipo,Tiempo,Ambito,Articulo,Grupo,Código"
             align="||left|left|left|left|left|left"

@@ -49,7 +49,7 @@
           namefield="PyrCon_CountryText"
           searchable="true"
           sort="CountrySpanish=asc"
-          datarequest="GetCountries" 
+          datasource="GetCountries" 
           source="CountrySpanish,Code"
           provoke="PyrCon_State"/>  
       </row>

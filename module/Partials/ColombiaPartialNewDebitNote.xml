@@ -9,7 +9,7 @@
       <control type="hidden" name="NewDebitNoteGuid"/>
       
       <!-- CHAIN STEP 1: Insert modified existing lines (Status=update) -->
-      <control type="button" name="btnInsertDebitLinesBatch_Update"
+      <control type="button" name="btnInsertDebitLinesBatchUpdate"
         action="batchinsert"
         capture="grdDebitNoteLines"
         datainsert="DIANInvoiceLines"
@@ -20,19 +20,26 @@
 
       <!-- CHAIN STEP 2: Insert completely new lines (Status=insert) -->
       <control type="button" name="btnInsertDebitLinesBatch_Insert"
-        action="batchinsert|close"
+        action="batchinsert"
         capture="grdDebitNoteLines"
         datainsert="DIANInvoiceLines"
         skipbatchrow="[[Status]]=insert"
         appendbatch="InvoiceGuid=[NewDebitNoteGuid],InvoiceLineGuid=(newUUID)"
         postwithout="Status"
         success="Nota Débito generada y lista para transmisión a la DIAN."
+        provoke="btnUpdateDebitDIANTotals"/>
+      <!-- Update the totals on the DIAN invoice header -->
+       <control type="button" name="btnUpdateDebitDIANTotals"
+        action="save|close|new"
+        acctsvc="true"
+        affector="none"
+        dataupdate="COLInsertDIANTotals"
+        appendupdate="InvoiceGuid=[NewDebitNoteGuid]"
         provoke="DianInvoiceList"/>
-
       <!-- Load the original DIAN Invoice Header -->
-      <control type="hidden" name="DianInvoiceGuid"
+      <control type="hidden" name="DebitInvoiceGuid"
         datarequest="COLGetDIANInvoices"
-        appendrequest="InvoiceGuid=[DianInvoiceGuid]" 
+        appendrequest="InvoiceGuid=[DebitInvoiceGuid]" 
         inject="grpDebitNoteHeaderInfo"
         provoke="grdDebitNoteLines"/>
     </group>
@@ -42,16 +49,8 @@
       <columns>
         <column span="12">
           <row>
-            <control type="hidden" name="DNH_CUFE"/>
-          </row>
-          <row>
             <control type="label" label="Factura DIAN" span="2"/>
             <control type="text" name="DNH_InvoiceNumber" span="3" readonly="true"/>
-            <control type="label" label="Motivo DIAN" span="2"/>
-            <!-- Standard DIAN UBL 2.1 Debit Note Reason Codes -->
-            <control type="select" name="DNH_DebitNoteConceptCode" span="5" required="true" edit="true"
-              source="1,2,3,4" 
-              sourcelabels="1 Intereses,2 Gastos por cobrar,3 Cambio del valor,4 Otros"/>
           </row>
           <row>
             <control type="label" label="NIT" span="2"/>
@@ -62,9 +61,16 @@
             <control type="text" name="DNH_PayerName" span="10" readonly="true"/>
           </row>
           <row>
-            
-            <control type="label" label="Observación" span="2"/>
-            <control type="textarea" name="DNH_DebitNoteObservation" span="10" rows="1" edit="true" required="true"/>
+            <control type="label" label="Motivo" span="2"/>
+            <!-- Standard DIAN UBL 2.1 Debit Note Reason Codes -->
+            <control type="select" name="DNH_ReasonCode" span="5" required="true" edit="true"
+              source="1,2,3,4" 
+              sourcelabels="1 Intereses,2 Gastos por cobrar,3 Cambio del valor,4 Otros"/>
+          </row>
+          <row>
+            <control type="label" label="Descripción" span="2"/>
+            <control type="textarea" name="DNH_ReasonDescription" span="10" rows="1" edit="true" required="true"
+            regex="^[\p{L}\p{N}\p{P}\p{S}\s]{2,250}$"/>
           </row>
         </column>
       </columns>
@@ -81,25 +87,25 @@
           edit="true"
           acctsvcreq="true"
           datarequest="COLGetDianInvoiceLines"
-          appendrequest="InvoiceGuid=[DianInvoiceGuid]"        
-          source="LineNumber,ItemCode,ItemDescription,Quantity,UnitPrice,TaxAmount,LineNetAmount,Status"
-          sourcelabels="Línea,CUPS,Descripción,Cant.,Precio Unit.,Impuesto,Valor Neto,Estatus"
-          format="|||0,0.00|0,000|0,000|0,000|"
-          align="center|left|left|center|right|right|right|center"
-          total="||||||+|"
+          appendrequest="InvoiceGuid=[DebitInvoiceGuid]"        
+          source="LineNumber,ItemCode,ItemDescription,Quantity,UnitPrice,LineDiscountAmount,LineTaxAmount,LineNetAmount,Status"
+          sourcelabels="Línea,CUPS,Descripción,Cant.,Precio Unit.,Descuento,Impuesto,Valor Neto,Estatus"
+          format="|||0,0.00|0,000|0,000|0,000|0,000|"
+          align="center|left|left|center|right|right|right|right|center"
+          total="|||||+|+|+|"
           key="InvoiceLineGuid"> 
           
           <!-- Master Button: Saves Header, returns Guid, triggers the batch loop chain -->
           <control type="button" name="btnGenerateDebitNote" label="Generar Nota Débito" icon="cloud-upload"
             action="save" color="blue"
             confirm="Confirme que desea generar la Nota Débito con las líneas agregadas o ajustadas."
-            capture="mdlCreateDebitNoteBatch"
+            capture="grpDebitNoteHeaderInfo"
             affector="NewDebitNoteGuid"
-            setaffector="DebitNoteGuid"
+            setaffector="InvoiceGuid"
             acctsvc="true"
-            datainsert="COLCreateDebitNoteHeader"
-            appendinsert="OriginalInvoiceGuid=[DianInvoiceGuid],OriginalCUFE=[DNH_CUFE],ConceptCode=[DNH_DebitNoteConceptCode],Observation=[DNH_DebitNoteObservation],FacilityId=(facilityData.LocationId),UserId=(userName)"
-            provoke="btnInsertDebitLinesBatch_Update"/>
+            datainsert="COLCreateDIANAdjustmentNote"
+            appendinsert="SourceInvoiceGuid=[DebitInvoiceGuid],InvoiceType=92"
+            provoke="btnInsertDebitLinesBatchUpdate"/>
         </control>
       </row>
     </group>
@@ -133,20 +139,45 @@
             term="cUPSName"
             source="CUPSName,CupsCode"/>
       </row>
-      <!-- Financials -->
+      <!-- Financials (UBL 2.1 Compliant) -->
       <row>
         <control type="label" label="Cantidad" span="2"/>
         <control type="text" name="DN_Quantity" span="4" edit="true" required="true" format="0,0.00"/>
+        <control type="text" name="DN_UnitOfMeasure" span="1" />
       </row>
       <row>
         <control type="label" label="Precio Unitario" span="2"/>
         <control type="text" name="DN_UnitPrice" span="4" edit="true" required="true" format="0,000"/>
       </row>
       <row>
+        <control type="label" label="Gross" span="2"/>
+        <control type="calc" name="DN_LineGrossAmount" span="4" format="0,000"
+          source="DN_Quantity*DN_UnitPrice"/>
+      </row>
+      <row>
+        <control type="label" label="Descuento" span="2"/>
+        <control type="text" name="DN_LineDiscountAmount" span="4" edit="true" required="true" default="0" format="0,000"/>
+      </row>
+      <row>
+        <control type="label" label="Gravable" span="2"/>
+        <control type="calc" name="DN_LineTaxableAmount" span="4" format="0,000"
+          source="DN_Quantity*DN_UnitPrice-DN_LineDiscountAmount"/>
+      </row>
+      <row>
+        <control type="label" label="Tasa Impuesto" span="2"/>
+        <control type="text" name="DN_LineTaxPercentage" span="4" edit="true" required="true" default="0" format="0.00"/>
+      </row>
+      <row>
+        <control type="label" label="Impuesto" span="2"/>
+        <control type="calc" name="DN_LineTaxAmount" span="4" format="0,000"
+          source="DN_LineTaxableAmount*DN_LineTaxPercentage"/>
+      </row>
+      <row>
         <control type="label" label="Total a Debitar" span="2"/>
         <control type="calc" name="DN_LineNetAmount" span="4" format="0,000"
-          source="DN_Quantity * DN_UnitPrice"/>
+          source="DN_LineTaxableAmount+DN_LineTaxAmount"/>
       </row>
+      
       <row>
         <!-- Triggers the datagrid row to flag status appropriately based on the action -->
         <control type="hidden" name="ru_Status" value="update" ignore="add" persist="true"/>

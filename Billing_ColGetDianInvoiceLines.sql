@@ -5,7 +5,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE OR ALTER PROCEDURE [odata].[COLGetDianInvoiceLines]
+CREATE OR ALTER PROCEDURE [dbo].[COLGetDianInvoiceLines]
     @InvoiceGuid NVARCHAR(50)
 AS
 BEGIN
@@ -15,13 +15,19 @@ BEGIN
         dil.InvoiceLineGuid,
         dil.InvoiceGuid,
         dil.LineNumber,
+        dil.LineType,
         dil.ItemCode,
         dil.ItemDescription,
         dil.Quantity,
+        dil.UnitOfMeasure,
         dil.UnitPrice,
-        dil.TaxAmount,
+        dil.LineGrossAmount,
+        dil.LineDiscountAmount,
+        dil.LineTaxableAmount,
+        dil.LineTaxPercentage,
+        dil.LineTaxAmount,
         dil.LineNetAmount
-    FROM ClinicalGeniusSupplyChain.DianInvoiceLines dil WITH(NOLOCK)
+    FROM ClinicalGeniusSupplyChain.dbo.DianInvoiceLines dil WITH(NOLOCK)
     WHERE dil.InvoiceGuid = @InvoiceGuid
     ORDER BY dil.LineNumber ASC;
 END;

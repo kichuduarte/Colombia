@@ -20,7 +20,7 @@
           capture="grdDianLinesForGlosa"
           datainsert="InvoiceGlosaLines"
           skipbatchrow="[[Status]]=update"
-          appendbatch="GlosaGuid=[NewBatchGlosaGuid],TransactionGuid=[[TransactionGuid]]"
+          appendbatch="GlosaGuid=[NewBatchGlosaGuid]" 
           postwithout="Status,RecId"
           success="Glosa y líneas disputadas registradas exitosamente."
           provoke="GlosaQueueList"/>
@@ -47,6 +47,7 @@
       </row>
       <!-- Interactive DIAN Lines Grid (Batch Mode) -->
       <row>  
+        <!-- TransactionGuid removed from source and total -->
         <control type="datagrid" name="grdDianLinesForGlosa" span="12" rows="15" label="Seleccione las líneas a disputar" 
           mode="batch"
           modalname="mdlGlosaLineEntry"         
@@ -55,11 +56,11 @@
           acctsvcreq="true"
           datarequest="COLGetDianInvoiceLines"
           appendrequest="InvoiceGuid=[GlosaInfo_InvoiceGuid]"
-          source="LineNumber,ItemCode,ItemDescription,LineNetAmount,GeneralGlosaCode,SpecificGlosaCode,DisputedAmount,PayerObservation,TransactionGuid,Status"
+          source="LineNumber,ItemCode,ItemDescription,LineNetAmount,GeneralGlosaCode,SpecificGlosaCode,DisputedAmount,PayerObservation,Status"
           sourcelabels="Línea,CUPS,Descripción,Valor Neto,C. General,C. Específico,Valor Disputado,Observación"
           align="center|left|left|right|center|center|right|left"
-          format="|||0,000|||0,000|||"
-          total="||||||+|||"
+          format="|||0,000|||0,000||"
+          total="||||||+||"
           key="InvoiceLineGuid">
           <!-- Master Button: Saves Header, returns Guid, triggers batch loop -->
           <control type="button" name="btnGenerateGlosaHeader" label="Crear Glosa y Guardar Líneas" icon="cloud-upload"
@@ -70,7 +71,7 @@
             setaffector="GlosaGuid"
             acctsvc="true"
             datainsert="COLInsertGlosa"
-            appendinsert="FacilityId=(facilityData.LocationId),UserId=(userName)"
+            appendinsert="FacilityId=(facilityData.LocationId),UserId=(userName),CreationSource=Manual"
             provoke="btnInsertGlosaLinesBatch"/>
         </control>
       </row>

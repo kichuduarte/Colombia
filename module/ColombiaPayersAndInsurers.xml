@@ -213,7 +213,7 @@
               searchable="true"
               required="true"
               sort="CountrySpanish=asc"
-              datarequest="GetCountries" 
+              datasource="GetCountries" 
               source="CountrySpanish,Code"
               provoke="Pyr_LegalStateCode"/>  
           <control type="label" label="Departamento" span="3"/>

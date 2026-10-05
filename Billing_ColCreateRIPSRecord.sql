@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE {odata}.{COLCreateRipsRecord}
+CREATE OR ALTER PROCEDURE [dbo].[COLCreateRipsRecord]
     @InvoiceGuid NVARCHAR(50),
     @FacilityId NVARCHAR(50)
 AS
@@ -21,14 +21,13 @@ BEGIN
             @PatientVisit NVARCHAR(50),
             @PatientId NVARCHAR(50),
             @ClaimGuid NVARCHAR(50),
-            @RipsGuid NVARCHAR(50) = NEWID(),
+            @RipsGuid NVARCHAR(50) = CAST(NEWID() AS NVARCHAR(50)),
             @VisitLocationId NVARCHAR(50),
             @CodPrestador  NVARCHAR(20),
             @NumDocumentoPrestador  NVARCHAR(20),
             -- Local holders for the resolved multi-tenant diagnostic strings
             @ResolvedPrincipalDiagnosis VARCHAR(10) = NULL;
 
-    -- FIXED: Added missing comma between @ClaimGuid and @VisitLocationId assignments
     SELECT TOP 1
         @InvoiceNumber = dii.InvoiceNumber,
         @PatientVisit = dii.PatientVisit,
@@ -78,7 +77,7 @@ BEGIN
     BEGIN TRY
         
         -- 1. Insert RIPS Master Transaction Token
-        INSERT INTO ClinicalGeniusSupplyChain.RipsTransactions (
+        INSERT INTO ClinicalGeniusSupplyChain.dbo.RipsTransactions (
             RipsGuid, InvoiceGuid, FacilityId, NumFactura, CodPrestador, NumDocumentoPrestador
         )
         VALUES (
@@ -91,7 +90,7 @@ BEGIN
         );
 
         -- 2. Insert RIPS User profile extraction mapping rules
-        INSERT INTO ClinicalGeniusSupplyChain.RipsUsuarios (
+        INSERT INTO ClinicalGeniusSupplyChain.dbo.RipsUsuarios (
             RipsGuid, TipoIdentificacion, NumIdentificacion, TipoUsuario, FechaNacimiento, CodSexo, CodMunicipioResidencia, ZonaTerritorioResidencia
         )
         SELECT TOP 1
@@ -132,10 +131,10 @@ BEGIN
                  ON pyr.PayerGuid = isc.PayerGuid
              WHERE pyc.PatientVisit = @PatientVisit
              ORDER BY pyc.BatchNumber ASC) pyx
-        WHERE pv.PatientVisit = @PatientVisit;
+        WHERE pv.PatientVisitUniqueId = @PatientVisit;
 
         -- 3. Deconstruct and stage active items into the unified services array
-        INSERT INTO ClinicalGeniusSupplyChain.RipsServicios (
+        INSERT INTO ClinicalGeniusSupplyChain.dbo.RipsServicios (
             RipsGuid, TransactionGuid, SurgeryGuid, ServiceCategory, ModalidadPago, CodServicio, Cantidad, 
             ValorUnitario, ValorTotal, ConceptoRecaudo, ValorCuota, FechaPrestacion, DiagnosticoPrincipal
         )
@@ -158,14 +157,14 @@ BEGIN
                 ELSE '02' 
             END AS ModalidadPago,
             CASE WHEN pt.TransactionType = 'Medication' THEN pt.CUMCode ELSE pt.CupsCode END AS CodServicio,
-            pt.Quantity,
+            pt.TransactionQuantity,
             pt.BaseUnitValue,
             pt.NetAmount AS ValorTotal, 
             '05' AS ConceptoRecaudo, 
             0.00, 
             pt.ExternalProcessedDateTime,
             @ResolvedPrincipalDiagnosis AS DiagnosticoPrincipal
-        FROM ClinicalGeniusSupplyChain.PatientTransactions pt WITH(NOLOCK)
+        FROM ClinicalGeniusSupplyChain.dbo.PatientTransactions pt WITH(NOLOCK)
         WHERE pt.PatientVisit = @PatientVisit
           AND pt.Status = 'Active'
           AND pt.Facility = @FacilityId 

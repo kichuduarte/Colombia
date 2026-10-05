@@ -8,6 +8,9 @@
 CREATE TABLE ClinicalGeniusSupplyChain.DianInvoices (
     FacilityId NVARCHAR(50),
     InvoiceGuid NVARCHAR(50) NOT NULL DEFAULT NEWID(),
+    SourceInvoiceGuid NVARCHAR(50),
+    ReasonCode INTEGER,
+    ReasonDescription NVARCHAR(250),
     InvoiceNumber NVARCHAR(20) NOT NULL,            -- e.g., SETT12345 (Prefijo + Número Correlativo)
     ResolutionNumber NVARCHAR(50) NOT NULL,         -- Official DIAN Resolution Auth Token
     PatientVisit NVARCHAR(50) NOT NULL,             -- Core relation bridge back to your EHR

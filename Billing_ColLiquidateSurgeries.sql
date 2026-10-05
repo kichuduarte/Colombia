@@ -8,7 +8,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE {odata}.{COLLiquidateSurgeries}
+CREATE OR ALTER PROCEDURE [dbo].[COLLiquidateSurgeries]
     @PatientVisit    NVARCHAR(50),
     @FacilityId      NVARCHAR(50),
     @TargetClaimGuid NVARCHAR(50)
@@ -533,7 +533,7 @@ BEGIN
             Facility, PatientId, PatientVisit, TransactionType, ClaimGuid, SurgeryGuid, ContractGuid, 
             ContractExceptionGuid, Ambity, BaseUnitValue, SurgicalComponent, SurgicalGroup, SurgicalApproach, 
             SameApproach, ShiftTypeApplied, SurchargeAmount, CupsCode, CUMCode, ExternalProcessedDateTime, 
-            DateTimeEntered, RevenueCode, Quantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
+            DateTimeEntered, RevenueCode, TransactionQuantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
             USDBasePrice, USDPerItemChargeAmount, PaymentType, NetAmount, TaxAmount, DiscountAmount, 
             PerItemChargeAmount, [Status], ProfessionalType, ProfessionalId
         )
@@ -563,7 +563,7 @@ BEGIN
             f.DateTimePerformed,                
             GETDATE() AS DateTimeEntered,                          
             f.ResolvedManual AS RevenueCode,                            
-            1 AS Quantity,                                  
+            1 AS TransactionQuantity,                                  
             f.SpecialistProcedureRank AS ItemCost,                    
             f.Laterality AS ItemSnomedCode,                       
             f.RawCatalogUnits AS ItemAlternateCode,                  
@@ -592,7 +592,7 @@ BEGIN
             Facility, PatientId, PatientVisit, TransactionType, ClaimGuid, SurgeryGuid, ContractGuid, 
             ContractExceptionGuid, Ambity, BaseUnitValue, SurgicalComponent, SurgicalGroup, SurgicalApproach, 
             SameApproach, ShiftTypeApplied, SurchargeAmount, CupsCode, CUMCode, ExternalProcessedDateTime, 
-            DateTimeEntered, RevenueCode, Quantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
+            DateTimeEntered, RevenueCode, TransactionQuantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
             USDBasePrice, USDPerItemChargeAmount, PaymentType, NetAmount, TaxAmount, DiscountAmount, 
             PerItemChargeAmount, [Status], ProfessionalType, ProfessionalId
         )
@@ -618,7 +618,7 @@ BEGIN
             f.DateTimePerformed, 
             GETDATE() AS DateTimeEntered, 
             f.ResolvedManual AS RevenueCode, 
-            1 AS Quantity, 
+            1 AS TransactionQuantity, 
             0.00 AS ItemCost, 
             0 AS ItemSnomedCode, 
             NULL AS ItemAlternateCode, 
@@ -649,7 +649,7 @@ BEGIN
             Facility, PatientId, PatientVisit, TransactionType, ClaimGuid, SurgeryGuid, ContractGuid, 
             ContractExceptionGuid, Ambity, BaseUnitValue, SurgicalComponent, SurgicalGroup, SurgicalApproach, 
             SameApproach, ShiftTypeApplied, SurchargeAmount, CupsCode, CUMCode, ExternalProcessedDateTime, 
-            DateTimeEntered, RevenueCode, Quantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
+            DateTimeEntered, RevenueCode, TransactionQuantity, ItemCost, ItemSnomedCode, ItemAlternateCode, LocalAmount, 
             USDBasePrice, USDPerItemChargeAmount, PaymentType, NetAmount, TaxAmount, DiscountAmount, 
             PerItemChargeAmount, [Status], ProfessionalType, ProfessionalId
         )
@@ -675,7 +675,7 @@ BEGIN
             ISNULL(sc.DateTimeCompleted, scx.DateTimePerformed) AS ExternalProcessedDateTime,
             GETDATE() AS DateTimeEntered,
             scx.ResolvedManual AS RevenueCode,
-            ISNULL(sc.Quantity, 1) AS Quantity,
+            ISNULL(sc.Quantity, 1) AS TransactionQuantity,
             CAST(ISNULL(sc.ItemCost, 0.00) AS DECIMAL(18,2)) AS ItemCost, 
             NULL AS ItemSnomedCode,
             sc.ConsumedUOM AS ItemAlternateCode,    

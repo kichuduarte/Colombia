@@ -59,7 +59,7 @@
       [IF ${[[ExceptionNotes]]}!]${[[ExceptionNotes]]}[br][/IF]
       [/div]
   </template>
-  <section type="tab" name="tabSurgeryCalendarAppointments" title="Calendarios de Cirugía" badge="none" trigger="SurgeryLocationId">
+  <section type="tab" name="tabSurgeryCalendarAppointments" title="Calendarios de Cirugía" badge="none" trigger="btnSetSurgeryLocationId">
     <group showif="never">
       <row>
         <control type="text" name="SurgeryDrop_PatientId"/>
@@ -87,20 +87,22 @@
           affector="none" 
           dataupdate="UpdateScheduledSurgeries"
 				  appendupdate="SurgeryGuid=[SurgeryDrop_SurgeryGuid],dateTimeScheduled=[SurgeryDrop_StartTime],endDateTime=[SurgeryDrop_EndTime],calculateEstimatedLength=true"/>
+         <control type="button" name="btnSetSurgeryLocationId" action="trigger"
+          set="[SurgeryLocationId]=;[SurgeryLocationId]=(facilityData.LocationId)"/>
         <control type="button" name="CloseSurgeryCalendar" action="close"/>
       </row>
     </group>
   	<group>
       <row>
-        <control type="hidden" name="CalendarRoomType" default="None"/>
+        <control type="hidden" name="CalendarRoomType"/>
       </row>
       <row>
-        <control type="select" name="SurgeryLocationId" span="3" edit="true" default="true"
-          acctsvcreq="true"
-          datarequest="GetHospitalByGroupId"
-          appendrequest="GroupId=(facilityData.GroupId)"
+        <control type="select" name="SurgeryLocationId" span="3" edit="true" persist="true"
+          acctsvc="true"
+          datasource="GetHospitalByGroupId"
+          append="GroupId=(facilityData.GroupId)"
           source="HospitalName,LocationId"
-          provoke="SurgeryCalendarLookup"/>
+          provoke="[SurgeryLocationId]!;SurgeryCalendarLookup"/>
         <!-- Select the calendar to view filter="CalendarType=Surgery" -->
         <control type="select" name="SurgeryCalendarLookup" span="3" default="true" explicit="true"
 				  datarequest="GetSchedulerAppointmentTypesByFacility" 
@@ -108,14 +110,14 @@
 				  source="CalendarName,CalendarGuid" 
           filter="CalendarType%Surgery,Active=true" 
 					sort="CalendarName=asc"
-          set="[[Service]]!;CalendarRoomType=[[Service]]^CalendarRoomType=None"
+          set="CalendarRoomType=[[Service]]"
 				  provoke="SurgerybtnRefreshCalendar"/>
         <control type="label" label="Especialidad" span="1"/>
         <control type="select" name="selCalendarSpecialty" span="2" searchable="true" edit="true"
           acctsvc="true"
           datasource="GetMedicalSpecialties"
           source="Specialty,MedicalSpecialtyGuid"
-         provoke="SurgerybtnRefreshCalendar"/>
+          provoke="SurgerybtnRefreshCalendar"/>
         <!-- Select surgeon -->
         <control type="label" label="Cirujano" span="1"/>
         <control type="select" name="SurgeryInf_SurgeonId"
@@ -135,7 +137,7 @@
             headerright="dayGridMonth,resourceTimeGridDay,listDay"
             resource="RoomAndBedNumber,RoomGuid"
             dataresource="GetRoomsAndBedsForThisFacility"
-            appendresource="LocationId=[SurgeryLocationId],RoomTypeGuid=[CalendarRoomType]"
+            appendresource="[SurgeryLocationId]!;LocationId=[SurgeryLocationId],[SurgeryLocationId]=;LocationId=None,RoomTypeGuid=[CalendarRoomType]"
             resourcefilter="RoomTypeGuid=[CalendarRoomType]"
             default="resourceTimeGridDay"
             navlinking="true"
@@ -148,7 +150,6 @@
             edit="true"
             editable="SurgeryGuid!"
             editduration="SurgeryGuid!"
-            idle="[SurgeryCalendarLookup]=|reset,"
             acctsvcreq="true"
             datarequest="GetScheduledSurgeriesAndExceptionsByDateRange"
             appendrequest="calendarGuid=[SurgeryCalendarLookup],[SurgeryInf_SurgeonId]!;surgeonId=[SurgeryInf_SurgeonId],[selCalendarSpecialty]!;MedicalSpecialty=[selCalendarSpecialty]"
@@ -158,7 +159,7 @@
             action="redirect"
             target="SurgeryTabModal"
             selectable="true"
-            selectabletarget="[[Type]]!Block;SurgeryTabModal"
+            selectabletarget="[[Type]]!Block+[SurgeryCalendarLookup]!;SurgeryTabModal"
             onselectableset="PatientSearched=false,EditMode=Surgery,Surgery_CalendarGuid=[SurgeryCalendarLookup],Surgery_DateTimeScheduled=[[start]],Surgery_EstimatedLength=[[duration]],Surgery_RoomGuid=[[resourceId]],Surgery_Status=Scheduled,EndDateTime=[[end]]"
             onselectset="SurgeryGuid=[[SurgeryGuid]],PatientId=[[PatientId]],EditMode=Surgery,PatientSearched=false"
             onselect="SurgeryGuid,PatientId"
@@ -171,7 +172,7 @@
             <!-- Button to refresh the calendar -->
             <control type="button" name="SurgerybtnRefreshCalendar"
               icon="refresh" label="Actualizar" action="trigger" 
-              provoke="[SurgeryCalendarLookup]!+[CalendarRoomType]!+[CalendarRoomType]!None;SurgeryTimes|resource^SurgeryTimes"/>
+              provoke="[SurgeryCalendarLookup]!+[CalendarRoomType]!+[CalendarRoomType]!;SurgeryTimes|resource^SurgeryTimes|reset"/>
           </control>
       </row>
 		</group>

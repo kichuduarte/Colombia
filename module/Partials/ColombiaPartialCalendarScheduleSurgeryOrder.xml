@@ -63,7 +63,7 @@
   	<group>
       <row showif="never">
         <control type="button" name="btnCloseOrderCalendar" action="close|new"/>
-        <control type="hidden" name="ScheduleOrderRoomType" default="None" persist="true"/>
+        <control type="hidden" name="ScheduleOrderRoomType"/>
       </row>
       <row>
         <control type="select" name="SurgeryOrderLocationId" span="3" edit="true" default="true"
@@ -74,8 +74,7 @@
           provoke="[SurgeryOrderLocationId]!;SurgeryCalendarOrderLookup,
             [SurgeryOrderLocationId]!;Order_RoomGuid"/>
         <!-- Select the calendar to view filter="CalendarType=Surgery" -->
-        <control type="select" 
-				  name="SurgeryCalendarOrderLookup" span="3" default="true" explicit="true"
+        <control type="select" name="SurgeryCalendarOrderLookup" span="3" default="true" explicit="true"
           namefield="OrderCalendarName"
 				  datarequest="GetSchedulerAppointmentTypesByFacility" 
           appendrequest="LocationId=[SurgeryOrderLocationId]" 
@@ -84,13 +83,13 @@
 				  edit="true" 
 					sort="CalendarName=asc"
           set="[[Service]]!;[ScheduleOrderRoomType]=[[Service]]^ScheduleOrderRoomType=None"
-				  provoke="[SurgeryCalendarOrderLookup]!;SurgeryOrderTimes|resource,Order_RoomGuid"/>
+				  provoke="btnSurgeryOrderRefreshCalendar,Order_RoomGuid"/>
          <control type="label" label="Especialidad" span="1"/>
         <control type="select" name="selCalendarOrderSpecialty" span="2" searchable="true" edit="true"
           acctsvc="true"
           datasource="GetMedicalSpecialties"
           source="Specialty,MedicalSpecialtyGuid"
-          provoke="[SurgeryCalendarOrderLookup]!;SurgeryOrderTimes|resource"/>
+          provoke="btnSurgeryOrderRefreshCalendar"/>
         <!-- Select surgeon -->
         <control type="label" label="Cirujano" span="1"/>
         <control type="select" name="selSurgeryOrder_SurgeonId"
@@ -99,7 +98,7 @@
           append="LocationId=[SurgeryOrderLocationId],role=Physician"
           source="UserFirstMiddleLast,UserId"
           span="2" explicit="true" edit="true"
-          provoke="[SurgeryCalendarOrderLookup]!;SurgeryOrderTimes|resource"/>
+          provoke="btnSurgeryOrderRefreshCalendar"/>
       </row>
 			<row>
           <!-- Surgery Calendar -->
@@ -110,7 +109,7 @@
             headerright="dayGridMonth,resourceTimeGridDay,listDay"
             resource="RoomAndBedNumber,RoomGuid"
             dataresource="GetRoomsAndBedsForThisFacility"
-            appendresource="LocationId=[SurgeryOrderLocationId]"
+            appendresource="[SurgeryOrderLocationId]!;LocationId=[SurgeryOrderLocationId],[SurgeryOrderLocationId]=;LocationId=None,RoomTypeGuid=[ScheduleOrderRoomType]"
             resourcefilter="RoomTypeGuid=[ScheduleOrderRoomType]"
             default="resourceTimeGridDay"
             navlinking="true"
@@ -141,7 +140,7 @@
             <!-- Button to refresh the calendar -->
             <control type="button" name="btnSurgeryOrderRefreshCalendar"
               icon="refresh" label="Actualizar" action="trigger" 
-              trigger="SurgeryOrderTimes|resource"/>
+              provoke="[SurgeryCalendarOrderLookup]!+[ScheduleOrderRoomType]!;SurgeryOrderTimes|resource"/>
           </control>
       </row>
 		</group>

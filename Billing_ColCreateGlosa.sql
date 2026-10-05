@@ -5,13 +5,13 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE OR ALTER PROCEDURE [odata].[COLCreateGlosa]
+CREATE OR ALTER PROCEDURE [dbo].[COLCreateGlosa]
     @FacilityId             NVARCHAR(50),
     @InvoiceNumber          NVARCHAR(20),
     @PayerGlosaReference    NVARCHAR(100),
     @RadicationDate         DATE,
     @UserId                 NVARCHAR(100),
-    @LinesXml               XML -- Batch payload of disputed lines
+    @LinesXml               XML -- Batch payload of disputed lines from Transfiriendo API
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -37,11 +37,15 @@ BEGIN
         ('2025-10-13'),('2025-11-03'),('2025-11-16'),('2025-12-08'),('2025-12-25'),
         ('2026-01-01'),('2026-01-12'),('2026-03-23'),('2026-04-02'),('2026-04-03'),('2026-05-01'),
         ('2026-05-18'),('2026-06-08'),('2026-06-15'),('2026-06-29'),('2026-07-20'),('2026-08-07'),
-        ('2026-08-17'),('2026-10-12'),('2026-11-02'),('2026-11-16'),('2026-12-08'),('2026-12-25');
+        ('2026-08-17'),('2026-10-12'),('2026-11-02'),('2026-11-16'),('2026-12-08'),('2026-12-25'),
+        -- 2027 Holidays Added to prevent deadline calculation failures
+        ('2027-01-01'),('2027-01-11'),('2027-03-22'),('2027-03-25'),('2027-03-26'),('2027-05-01'),
+        ('2027-05-17'),('2027-06-07'),('2027-06-14'),('2027-07-05'),('2027-07-20'),('2027-08-07'),
+        ('2027-08-16'),('2027-10-18'),('2027-11-01'),('2027-11-15'),('2027-12-08'),('2027-12-25');
 
-    -- 1. Locate the DIAN Invoice Header
+    -- 1. Locate the DIAN Invoice Header using dbo schema
     SELECT TOP 1 @InvoiceGuid = InvoiceGuid 
-    FROM ClinicalGeniusSupplyChain.DianInvoices WITH(NOLOCK)
+    FROM ClinicalGeniusSupplyChain.dbo.DianInvoices WITH(NOLOCK)
     WHERE InvoiceNumber = @InvoiceNumber 
       AND FacilityId = @FacilityId;
 
@@ -70,64 +74,77 @@ BEGIN
         CREATE TABLE #ParsedGlosaLines (
             LineNumber INT,
             GeneralGlosaCode VARCHAR(2),
-            SpecificGlosaCode VARCHAR(3),
-            DisputedAmount DECIMAL(18,2),
-            PayerObservation NVARCHAR(MAX)
+            SpecificGlosaCode VARCHAR(4),
+            RawDisputedAmount DECIMAL(18,2),
+            PayerObservation NVARCHAR(MAX),
+            CappedDisputedAmount DECIMAL(18,2) DEFAULT 0.00
         );
 
-        INSERT INTO #ParsedGlosaLines (LineNumber, GeneralGlosaCode, SpecificGlosaCode, DisputedAmount, PayerObservation)
+        INSERT INTO #ParsedGlosaLines (LineNumber, GeneralGlosaCode, SpecificGlosaCode, RawDisputedAmount, PayerObservation)
         SELECT 
             T.c.value('(LineNumber)[1]', 'INT'),
             T.c.value('(GeneralGlosaCode)[1]', 'VARCHAR(2)'),
-            T.c.value('(SpecificGlosaCode)[1]', 'VARCHAR(3)'),
+            T.c.value('(SpecificGlosaCode)[1]', 'VARCHAR(4)'), 
             T.c.value('(DisputedAmount)[1]', 'DECIMAL(18,2)'),
             T.c.value('(PayerObservation)[1]', 'NVARCHAR(MAX)')
         FROM @LinesXml.nodes('/Lines/Line') T(c);
 
-        -- 4. Calculate total disputed amount directly from lines
-        SELECT @CalculatedDisputed = ISNULL(SUM(DisputedAmount), 0.00)
+        -- 4. Math Bug Fix: Calculate safe, capped disputed amounts comparing against the original DIAN lines
+        UPDATE pgl
+        SET pgl.CappedDisputedAmount = CASE 
+            WHEN pgl.RawDisputedAmount > dil.LineNetAmount THEN dil.LineNetAmount 
+            ELSE pgl.RawDisputedAmount 
+        END
+        FROM #ParsedGlosaLines pgl
+        INNER JOIN ClinicalGeniusSupplyChain.dbo.DianInvoiceLines dil WITH(NOLOCK)
+            ON dil.InvoiceGuid = @InvoiceGuid 
+           AND dil.LineNumber = pgl.LineNumber;
+
+        -- 5. Math Bug Fix: Calculate total disputed amount using the capped, validated amounts
+        SELECT @CalculatedDisputed = ISNULL(SUM(CappedDisputedAmount), 0.00)
         FROM #ParsedGlosaLines;
 
-        -- 5. Insert Glosa Header
-        INSERT INTO ClinicalGeniusSupplyChain.InvoiceGlosas (
+        -- 6. Insert Glosa Header
+        INSERT INTO ClinicalGeniusSupplyChain.dbo.InvoiceGlosas (
             FacilityId, GlosaGuid, InvoiceGuid, PayerGlosaReference, 
             RadicationDate, ResponseDeadlineDate, TotalDisputedAmount, 
             TotalAcceptedAmount, TotalDefendedAmount, Status, 
+            CreationSource, 
             DateTimeEntered, LastUpdatedBy
         )
         VALUES (
             @FacilityId, @GlosaGuid, @InvoiceGuid, @PayerGlosaReference,
             @RadicationDate, @ResponseDeadline, @CalculatedDisputed,
             0.00, 0.00, 'Radicada',
+            'Electronic', 
             GETDATE(), @UserId
         );
 
-        -- 6. Insert Glosa Detail Lines (Mapping to DianInvoiceLines AND PatientTransactions)
-        INSERT INTO ClinicalGeniusSupplyChain.InvoiceGlosaLines (
-            GlosaGuid, InvoiceLineGuid, TransactionGuid, 
+        -- 7. Insert Glosa Detail Lines (Added sequential LineNumber)
+        INSERT INTO ClinicalGeniusSupplyChain.dbo.InvoiceGlosaLines (
+            GlosaGuid, LineNumber, InvoiceLineGuid, 
             GeneralGlosaCode, SpecificGlosaCode, DisputedAmount, 
             AcceptedAmount, DefendedAmount, PayerObservation, LineStatus
         )
         SELECT 
             @GlosaGuid,
+            ROW_NUMBER() OVER(ORDER BY pgl.LineNumber ASC), -- Generates the sequential Glosa LineNumber
             dil.InvoiceLineGuid,
-            dil.TransactionGuid,
             pgl.GeneralGlosaCode,
             pgl.SpecificGlosaCode,
-            -- Cap dispute at line net amount to prevent negative balances
-            CASE WHEN pgl.DisputedAmount > dil.LineNetAmount THEN dil.LineNetAmount ELSE pgl.DisputedAmount END,
+            pgl.CappedDisputedAmount, 
             0.00,
             0.00,
             pgl.PayerObservation,
             'Pending'
         FROM #ParsedGlosaLines pgl
-        INNER JOIN ClinicalGeniusSupplyChain.DianInvoiceLines dil WITH(NOLOCK)
+        INNER JOIN ClinicalGeniusSupplyChain.dbo.DianInvoiceLines dil WITH(NOLOCK)
             ON dil.InvoiceGuid = @InvoiceGuid 
            AND dil.LineNumber = pgl.LineNumber;
 
         COMMIT TRANSACTION;
 
-        -- 7. Return summary confirmation to the calling service
+        -- 8. Return summary confirmation to the calling Node.js service
         SELECT 
             @GlosaGuid AS GlosaGuid,
             @ResponseDeadline AS ResponseDeadlineDate,
